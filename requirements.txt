@@ -1,0 +1,6 @@
+# AprilTag 追蹤小車 — Python 依賴
+# opencv-python>=4.8.0  # 已改用 apt 安裝的 python3-opencv 系統庫，避免 V4L2 相容性問題
+pupil-apriltags>=1.0.4
+numpy>=1.24.0
+matplotlib>=3.7.0
+RPi.GPIO>=0.7.1

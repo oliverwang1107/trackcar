@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python Virtual Environments
+venv/
+.venv/
+env/
+.env/
+
+# IDE and Editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific generated files (Camera Calibration)
+camera_params.npz
+calibration_images/
+
+# General OS files
+.DS_Store
+Thumbs.db
