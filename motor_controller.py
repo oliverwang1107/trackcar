@@ -3,67 +3,52 @@ AprilTag 追蹤小車 — 馬達控制模組
 
 透過 TB6612FNG 驅動模組控制兩顆 TT 減速馬達。
 支援前進、後退、轉彎、差速控制。
+改用 gpiozero 以支援 Raspberry Pi 5 與最新的 Bookworm 系統。
 """
 
-import RPi.GPIO as GPIO
+from gpiozero import PWMOutputDevice, DigitalOutputDevice
 import config
-
 
 class MotorController:
     """TB6612FNG 雙馬達控制器。"""
 
     def __init__(self):
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
+        # 設定並啟用 STBY 腳位
+        self._stby = DigitalOutputDevice(config.STBY_PIN, initial_value=True)
 
-        # ---- 設定所有控制腳位為輸出 ----
-        self._setup_pin(config.MOTOR_A["IN1"])
-        self._setup_pin(config.MOTOR_A["IN2"])
-        self._setup_pin(config.MOTOR_B["IN1"])
-        self._setup_pin(config.MOTOR_B["IN2"])
-        self._setup_pin(config.STBY_PIN)
+        # 初始化馬達 A (左輪)
+        self._in1_a = DigitalOutputDevice(config.MOTOR_A["IN1"], initial_value=False)
+        self._in2_a = DigitalOutputDevice(config.MOTOR_A["IN2"], initial_value=False)
+        self._pwm_a = PWMOutputDevice(config.MOTOR_A["PWM"], frequency=config.PWM_FREQUENCY, initial_value=0)
 
-        # ---- 設定 PWM 腳位 ----
-        GPIO.setup(config.MOTOR_A["PWM"], GPIO.OUT)
-        GPIO.setup(config.MOTOR_B["PWM"], GPIO.OUT)
-        self._pwm_a = GPIO.PWM(config.MOTOR_A["PWM"], config.PWM_FREQUENCY)
-        self._pwm_b = GPIO.PWM(config.MOTOR_B["PWM"], config.PWM_FREQUENCY)
-        self._pwm_a.start(0)
-        self._pwm_b.start(0)
+        # 初始化馬達 B (右輪)
+        self._in1_b = DigitalOutputDevice(config.MOTOR_B["IN1"], initial_value=False)
+        self._in2_b = DigitalOutputDevice(config.MOTOR_B["IN2"], initial_value=False)
+        self._pwm_b = PWMOutputDevice(config.MOTOR_B["PWM"], frequency=config.PWM_FREQUENCY, initial_value=0)
 
-        # ---- 啟用 TB6612（STBY 拉高） ----
-        GPIO.output(config.STBY_PIN, GPIO.HIGH)
-
-        print("[MotorController] 初始化完成")
+        print("[MotorController] 初始化完成 (使用 gpiozero)")
 
     # ------------------------------------------------------------------
     #  內部工具
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _setup_pin(pin: int):
-        GPIO.setup(pin, GPIO.OUT)
-        GPIO.output(pin, GPIO.LOW)
-
-    def _set_motor(self, in1: int, in2: int, pwm, speed: float):
+    def _set_motor(self, in1, in2, pwm, speed: float):
         """
         控制單顆馬達。
-
-        :param speed: -100 ~ 100（負數 = 反轉）
         """
-        speed = max(-100, min(100, speed))
+        speed_val = max(-100, min(100, speed)) / 100.0
 
-        if speed > 0:
-            GPIO.output(in1, GPIO.HIGH)
-            GPIO.output(in2, GPIO.LOW)
-        elif speed < 0:
-            GPIO.output(in1, GPIO.LOW)
-            GPIO.output(in2, GPIO.HIGH)
+        if speed_val > 0:
+            in1.on()
+            in2.off()
+        elif speed_val < 0:
+            in1.off()
+            in2.on()
         else:
-            GPIO.output(in1, GPIO.LOW)
-            GPIO.output(in2, GPIO.LOW)
+            in1.off()
+            in2.off()
 
-        pwm.ChangeDutyCycle(abs(speed))
+        pwm.value = abs(speed_val)
 
     # ------------------------------------------------------------------
     #  公開 API
@@ -76,14 +61,8 @@ class MotorController:
         :param left_speed:  -100 ~ 100
         :param right_speed: -100 ~ 100
         """
-        self._set_motor(
-            config.MOTOR_A["IN1"], config.MOTOR_A["IN2"],
-            self._pwm_a, left_speed,
-        )
-        self._set_motor(
-            config.MOTOR_B["IN1"], config.MOTOR_B["IN2"],
-            self._pwm_b, right_speed,
-        )
+        self._set_motor(self._in1_a, self._in2_a, self._pwm_a, left_speed)
+        self._set_motor(self._in1_b, self._in2_b, self._pwm_b, right_speed)
 
     def forward(self, speed: float = None):
         """兩輪同速前進。"""
@@ -111,12 +90,20 @@ class MotorController:
 
     def standby(self, enable: bool = True):
         """進入 / 離開待機模式。"""
-        GPIO.output(config.STBY_PIN, GPIO.LOW if enable else GPIO.HIGH)
+        if enable:
+            self._stby.off()
+        else:
+            self._stby.on()
 
     def cleanup(self):
         """安全釋放 GPIO 資源。"""
         self.stop()
-        self._pwm_a.stop()
-        self._pwm_b.stop()
-        GPIO.cleanup()
+        self._pwm_a.close()
+        self._pwm_b.close()
+        self._in1_a.close()
+        self._in2_a.close()
+        self._in1_b.close()
+        self._in2_b.close()
+        self._stby.close()
         print("[MotorController] GPIO 已釋放")
+

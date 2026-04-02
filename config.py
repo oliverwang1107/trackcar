@@ -10,20 +10,20 @@ AprilTag 追蹤小車 — 集中配置檔
 
 # 馬達 A（左輪）
 MOTOR_A = {
-    "IN1": 17,    # AIN1 → GPIO17 (Pin 11)
-    "IN2": 27,    # AIN2 → GPIO27 (Pin 13)
-    "PWM": 12,    # PWMA → GPIO12 (Pin 32) — 硬體 PWM0
+    "IN1": 17,    # AIN1 → GPIO17 (實體腳位 Pin 11)
+    "IN2": 27,    # AIN2 → GPIO27 (實體腳位 Pin 13)
+    "PWM": 12,    # PWMA → GPIO12 (實體腳位 Pin 32)
 }
 
 # 馬達 B（右輪）
 MOTOR_B = {
-    "IN1": 22,    # BIN1 → GPIO22 (Pin 15)
-    "IN2": 23,    # BIN2 → GPIO23 (Pin 16)
-    "PWM": 13,    # PWMB → GPIO13 (Pin 33) — 硬體 PWM1
+    "IN1": 22,    # BIN1 → GPIO22 (實體腳位 Pin 15)
+    "IN2": 23,    # BIN2 → GPIO23 (實體腳位 Pin 16)
+    "PWM": 13,    # PWMB → GPIO13 (實體腳位 Pin 33)
 }
 
 # TB6612FNG 待機腳位（拉高才能運作）
-STBY_PIN = 24     # STBY → GPIO24 (Pin 18)
+STBY_PIN = 24     # STBY → GPIO24 (實體腳位 Pin 18)
 
 # PWM 頻率（Hz）
 PWM_FREQUENCY = 1000
