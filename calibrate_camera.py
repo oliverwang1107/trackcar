@@ -30,7 +30,7 @@ def main():
     objpoints = [] # 真實世界 3D 點
     imgpoints = [] # 影像中 2D 點
 
-    cap = cv2.VideoCapture(config.CAMERA_INDEX)
+    cap = cv2.VideoCapture(config.CAMERA_INDEX, cv2.CAP_V4L2)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
 

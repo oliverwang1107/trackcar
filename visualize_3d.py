@@ -25,13 +25,13 @@ def draw_cube(img, imgpts):
     :param imgpts: 投影後的 8 個端點 2D 座標
     """
     imgpts = np.int32(imgpts).reshape(-1, 2)
-    # 畫底面 (綠色)
-    cv2.drawContours(img, [imgpts[:4]], -1, (0, 255, 0), -3)
+    # 畫前面 (綠色)
+    cv2.drawContours(img, [imgpts[:4]], -1, (0, 255, 0), 2)
     # 畫支柱 (藍色)
     for i, j in zip(range(4), range(4, 8)):
-        cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]), (255, 0, 0), 3)
-    # 畫頂面 (紅色)
-    cv2.drawContours(img, [imgpts[4:]], -1, (0, 0, 255), 3)
+        cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]), (255, 0, 0), 2)
+    # 畫後面 (紅色)
+    cv2.drawContours(img, [imgpts[4:]], -1, (0, 0, 255), 2)
     return img
 
 def main():
@@ -53,39 +53,48 @@ def main():
     print("準備就緒！請將 AprilTag 放在鏡頭前。")
     print("按下 [q] 鍵或 [Esc] 鍵結束演示。")
 
-    # 定義一個虛擬立體方塊的 8 個頂點 (以標籤中心為原點，向上浮起)
-    # AprilTag 標籤的邊長預設存在 config.TAG_SIZE
-    s = config.TAG_SIZE / 2.0
+    # 定義一個虛擬立體方塊的 8 個頂點 (以剛體中心為原點，符合 config 定義)
+    s = config.CUBE_SIZE / 2.0
     cube_points = np.float32([
-        [-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0],          # 底面 (與標籤貼齊)
-        [-s, -s, -s*2], [s, -s, -s*2], [s, s, -s*2], [-s, s, -s*2] # 頂面 (Z 軸朝相機，因此是負的)
+        [-s, s, -s], [s, s, -s], [s, -s, -s], [-s, -s, -s],          # 前面 (FRONT, Z=-s)
+        [-s, s,  s], [s, s,  s], [s, -s,  s], [-s, -s,  s],          # 後面 (BACK, Z=s)
     ])
+    # 這裡為求畫圖簡單，直接連線前四個跟後四個點 (底跟柱)。需要修正 draw_cube 的接線法。
 
     try:
         while True:
-            tags, frame = detector.detect()
+            # 優先使用 Bundle 聯合偵測，畫面會更加穩定
+            bundle, tags, frame = detector.get_bundle_target()
             
             if frame is None:
                 continue
                 
+            # 若有 Bundle，則畫出這個大方塊的姿態
+            if bundle is not None and getattr(bundle, 'pose_t', None) is not None:
+                rvec, _ = cv2.Rodrigues(bundle.pose_R)
+                tvec = bundle.pose_t
+                
+                # 1. 畫出 3D 座標軸 (長度為方塊邊長)
+                cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec, tvec, config.CUBE_SIZE)
+                
+                # 2. 將大方塊的 8 個頂點投影到 2D 畫面上
+                imgpts, jac = cv2.projectPoints(cube_points, rvec, tvec, camera_matrix, dist_coeffs)
+                frame = draw_cube(frame, imgpts)
+                
+                # 3. 標註文字參數
+                dist_z = tvec[2][0]
+                # 嘗試將中心投影
+                cen_pts, _ = cv2.projectPoints(np.float32([[0,0,0]]), rvec, tvec, camera_matrix, dist_coeffs)
+                cx, cy = int(cen_pts[0][0][0]), int(cen_pts[0][0][1])
+                cv2.putText(frame, f"BUNDLE Z: {dist_z:.3f}m", (cx - 60, cy + 60), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                            
+            # 仍可畫出原始的小 tag 以便除錯
             for tag in tags:
-                if tag.pose_t is not None and tag.pose_R is not None:
-                    # pupil-apriltags 的旋轉矩陣是 3x3，需轉為 Rodrigues 向量 (3x1) 給 cv2 使用
+                if getattr(tag, 'pose_t', None) is not None:
+                    # 畫小 tag 座標軸
                     rvec, _ = cv2.Rodrigues(tag.pose_R)
-                    tvec = tag.pose_t
-                    
-                    # 1. 畫出 3D 座標軸 (長度為標籤邊長)
-                    cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec, tvec, config.TAG_SIZE)
-                    
-                    # 2. (進階) 將我們定義的 3D 立方體頂點投影到 2D 畫面上
-                    imgpts, jac = cv2.projectPoints(cube_points, rvec, tvec, camera_matrix, dist_coeffs)
-                    frame = draw_cube(frame, imgpts)
-                    
-                    # 3. 標註文字參數
-                    dist_z = tvec[2][0]
-                    cx, cy = int(tag.center[0]), int(tag.center[1])
-                    cv2.putText(frame, f"Z: {dist_z:.3f}m", (cx - 40, cy + 40), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                    cv2.drawFrameAxes(frame, camera_matrix, dist_coeffs, rvec, tag.pose_t, config.TAG_SIZE / 2)
 
             cv2.imshow('3D Pose AR Simulator', frame)
 

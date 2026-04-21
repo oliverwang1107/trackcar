@@ -3,8 +3,9 @@
 AprilTag 追蹤小車 — 主程式入口
 
 使用方式：
-    python3 main.py                 # 基本追蹤模式
-    python3 main.py --preview       # 開啟即時預覽視窗
+    python3 main.py                 # 基本追蹤模式 (偵測到螢幕時預設開啟預覽)
+    python3 main.py --no-preview    # 關閉預覽視窗
+    python3 main.py --preview       # 強制開啟預覽視窗
     python3 main.py --tag-id 3      # 只追蹤 ID=3 的 tag
     python3 main.py --speed 50      # 設定基礎速度為 50
     python3 main.py --test-motors   # 測試馬達（不啟動攝影機）
@@ -13,6 +14,7 @@ AprilTag 追蹤小車 — 主程式入口
 import argparse
 import sys
 import time
+import os
 
 import config
 
@@ -86,9 +88,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
+    has_display = "DISPLAY" in os.environ
     parser.add_argument(
-        "--preview", action="store_true",
-        help="開啟即時預覽視窗（需要連接螢幕或 VNC）",
+        "--preview", action="store_true", default=has_display,
+        help="開啟即時預覽視窗（預設：偵測到螢幕時開啟）",
+    )
+    parser.add_argument(
+        "--no-preview", action="store_false", dest="preview",
+        help="強制關閉預覽視窗",
     )
     parser.add_argument(
         "--tag-id", type=int, default=None,
